@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -8,53 +7,60 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-```
-const firebaseConfig = {
-  apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
-  authDomain: "modudag2025.firebaseapp.com",
-  projectId: "modudag2025",
-  storageBucket: "modudag2025.firebasestorage.app",
-  messagingSenderId: "1025892096437",
-  appId: "1:1025892096437:web:2b847461eab089f52c21fc"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
+      authDomain: "modudag2025.firebaseapp.com",
+      projectId: "modudag2025",
+      storageBucket: "modudag2025.firebasestorage.app",
+      messagingSenderId: "1025892096437",
+      appId: "1:1025892096437:web:2b847461eab089f52c21fc"
+    };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const configRef = doc(db, "config", "global");
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const configRef = doc(db, "config", "global");
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const form = document.getElementById("settingsForm");
-  const status = document.getElementById("status");
-
-  const snap = await getDoc(configRef);
-  if (snap.exists()) {
-    const data = snap.data();
-    document.getElementById("deadline").value = data.deadline || "";
-    for (let i = 0; i < 6; i++) {
-      document.getElementById(`code${i+1}`).value = data.correctCodes?.[i] || "";
+    async function loadSettings() {
+      const snap = await getDoc(configRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        document.getElementById("deadline").value = data.deadline || "";
+        for (let i = 0; i < 6; i++) {
+          document.getElementById(`code${i+1}`).value = data.correctCodes?.[i] || "";
+        }
+      }
     }
-  }
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const deadline = document.getElementById("deadline").value;
-    const codes = [];
-    for (let i = 0; i < 6; i++) {
-      codes.push(document.getElementById(`code${i+1}`).value.trim());
+    async function saveSettings(event) {
+      event.preventDefault();
+      const deadline = document.getElementById("deadline").value;
+      const codes = [];
+      for (let i = 0; i < 6; i++) {
+        codes.push(document.getElementById(`code${i+1}`).value.trim());
+      }
+      const statusEl = document.getElementById("status");
+      try {
+        await setDoc(configRef, { deadline, correctCodes: codes });
+        statusEl.textContent = "✅ Settings saved!";
+        statusEl.style.color = "lime";
+      } catch (error) {
+        console.error("Error saving settings:", error);
+        statusEl.textContent = "❌ Failed to save settings. Check connection or console.";
+        statusEl.style.color = "red";
+      }
     }
-    await setDoc(configRef, { deadline, correctCodes: codes });
-    status.textContent = "Settings saved!";
-  });
-});
-```
 
+    document.addEventListener("DOMContentLoaded", () => {
+      loadSettings();
+      document.getElementById("settingsForm").addEventListener("submit", saveSettings);
+    });
   </script>
   <style>
     body { font-family: sans-serif; padding: 20px; background: #111; color: #0f0; }
     label, input { display: block; margin: 10px 0; font-size: 1em; }
     input[type="text"], input[type="datetime-local"] { width: 300px; padding: 5px; font-size: 1em; }
     button { padding: 10px 20px; font-size: 1em; margin-top: 20px; cursor: pointer; }
-    #status { margin-top: 20px; color: lime; font-weight: bold; }
+    #status { margin-top: 20px; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -63,18 +69,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     <label for="deadline">Deadline (UTC):</label>
     <input type="datetime-local" id="deadline" required>
 
-```
-<h3>Correct Codes</h3>
-<input type="text" id="code1" placeholder="Code 1" required>
-<input type="text" id="code2" placeholder="Code 2" required>
-<input type="text" id="code3" placeholder="Code 3" required>
-<input type="text" id="code4" placeholder="Code 4" required>
-<input type="text" id="code5" placeholder="Code 5" required>
-<input type="text" id="code6" placeholder="Code 6" required>
+    <h3>Correct Codes</h3>
+    <input type="text" id="code1" placeholder="Code 1" required>
+    <input type="text" id="code2" placeholder="Code 2" required>
+    <input type="text" id="code3" placeholder="Code 3" required>
+    <input type="text" id="code4" placeholder="Code 4" required>
+    <input type="text" id="code5" placeholder="Code 5" required>
+    <input type="text" id="code6" placeholder="Code 6" required>
 
-<button type="submit">Save Settings</button>
-```
-
+    <button type="submit">Save Settings</button>
   </form>
   <p id="status"></p>
 </body>
