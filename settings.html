@@ -93,17 +93,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const container = document.getElementById("codesAndHints");
     for (let i = 1; i <= 6; i++) {
       const section = document.createElement("div");
+      section.style.display = "flex";
+      section.style.alignItems = "center";
+      section.style.gap = "10px";
+      section.style.marginBottom = "10px";
       section.innerHTML = `
-        <label>Code ${i}</label>
+        <label style="min-width:60px;">Code ${i}</label>
         <input type="text" id="code${i}" placeholder="Code ${i}" required>
-        <label>Hint 1</label>
-        <input type="text" id="hint${i}-1" placeholder="Hint 1 for Code ${i}">
-        <label>Hint 2</label>
-        <input type="text" id="hint${i}-2" placeholder="Hint 2 for Code ${i}">
-        <label>Hint 3</label>
-        <input type="text" id="hint${i}-3" placeholder="Hint 3 for Code ${i}">
+        <input type="text" id="hint${i}-1" placeholder="Hint 1" style="flex:1">
+        <input type="text" id="hint${i}-2" placeholder="Hint 2" style="flex:1">
+        <input type="text" id="hint${i}-3" placeholder="Hint 3" style="flex:1">
       `;
       container.appendChild(section);
+    }
     }
   </script>
 </body>
