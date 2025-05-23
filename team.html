@@ -1,8 +1,281 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>MODU - Compact Hints with Firebase</title>
-  ...
+  <title>MODU Team Page</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: monospace;
+    }
+    iframe {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      filter: blur(5px) brightness(0.5);
+      z-index: 0;
+    }
+    #overlay {
+      position: relative;
+      z-index: 1;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 30px;
+      border: 2px solid lime;
+      color: lime;
+      text-align: center;
+      max-width: 700px;
+      margin: 50px auto;
+      border-radius: 10px;
+    }
+    input {
+      margin: 2px;
+      padding: 3px 6px;
+      font-size: 0.85em;
+    }
+    button {
+      margin: 2px;
+      padding: 2px 5px;
+      font-size: 0.75em;
+      cursor: pointer;
+    }
+    .hint-used {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #hintLog {
+      margin-top: 20px;
+      color: yellow;
+    }
+    .flash-error {
+      animation: red-flash 1s ease-in-out;
+    }
+    .flash-success {
+      animation: green-flash 1s ease-in-out;
+    }
+    #endMessage {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 10000;
+      width: 100%;
+      height: 100%;
+      background: black;
+      color: lime;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2em;
+      font-weight: bold;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+      pointer-events: none;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+    .pulsing {
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes red-flash {
+      0% { background-color: rgba(255, 0, 0, 0.6); }
+      100% { background-color: transparent; }
+    }
+    @keyframes green-flash {
+      0% { background-color: rgba(0, 255, 0, 0.6); }
+      100% { background-color: transparent; }
+    }
+  
+    input.success {
+      border: 2px solid lime;
+      background-color: #002200;
+      color: lime;
+    }
+    input.error {
+      border: 2px solid red;
+      background-color: #220000;
+      color: red;
+    }
+    
+  
+    @keyframes shake {
+      0% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      50% { transform: translateX(4px); }
+      75% { transform: translateX(-4px); }
+      100% { transform: translateX(0); }
+    }
+
+    input.shake {
+      animation: shake 0.4s ease-in-out;
+    }
+    
+  </style>
+</head>
+<body>
+<iframe src="https://www.moduvalves.com"></iframe>
+<div id="overlay">
+  <h1>RedBear Hackers</h1>
+  <p>Enter all six codes to decrypt the data before the timer runs out. Hints cost time!</p>
+  <p><strong>Deadline:</strong> <span id="deadlineDisplay"></span></p>
+  <h2 id="timer">--:--</h2>
+  <div id="codesContainer"></div>
+  <div id="hintLog">Total time penalty: 0 minutes</div>
+  <p id="finalMessage"></p>
+</div>
+<div id="endMessage">💾 DATA RECOVERED - Decryption key created<br>"<strong>MAKE IT BETTER.</strong>"</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
+    authDomain: "modudag2025.firebaseapp.com",
+    projectId: "modudag2025",
+    storageBucket: "modudag2025.firebasestorage.app",
+    messagingSenderId: "1025892096437",
+    appId: "1:1025892096437:web:2b847461eab089f52c21fc"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const teamId = urlParams.get("team") || "test-team";
+
+  const deadline = new Date("2025-05-22T14:30:00");
+  document.getElementById('deadlineDisplay').textContent = deadline.toLocaleString();
+
+  const correctCodes = ["MODU01", "MODU02", "MODU03", "MODU04", "MODU05", "MODU06"];
+  const hints = {
+    1: { 1: "Hint 1 for Code 1", 2: "Hint 2 for Code 1", 3: "Hint 3 for Code 1" },
+    2: { 1: "Hint 1 for Code 2", 2: "Hint 2 for Code 2", 3: "Hint 3 for Code 2" },
+    3: { 1: "Hint 1 for Code 3", 2: "Hint 2 for Code 3", 3: "Hint 3 for Code 3" },
+    4: { 1: "Hint 1 for Code 4", 2: "Hint 2 for Code 4", 3: "Hint 3 for Code 4" },
+    5: { 1: "Hint 1 for Code 5", 2: "Hint 2 for Code 5", 3: "Hint 3 for Code 5" },
+    6: { 1: "Hint 1 for Code 6", 2: "Hint 2 for Code 6", 3: "Hint 3 for Code 6" }
+  };
+
+  const codesContainer = document.getElementById("codesContainer");
+  const timerElement = document.getElementById("timer");
+  const finalMessageElement = document.getElementById("finalMessage");
+  const hintLogElement = document.getElementById("hintLog");
+  const overlayElement = document.getElementById("overlay");
+  const endMessage = document.getElementById("endMessage");
+
+  let timePenalty = 0;
+  let penaltyMinutes = 0;
+  let status = [false, false, false, false, false, false];
+
+  correctCodes.forEach((code, index) => {
+    const block = document.createElement("div");
+    block.innerHTML = `
+      <input id="code${index + 1}" placeholder="Code ${index + 1}">
+      <button onclick="validateCode(${index + 1})">Validate</button>
+      <button class="pulsing" id="hint1-${index + 1}" title="-1 min" onclick="useHint(${index + 1}, 1)">?</button>
+      <button class="pulsing" id="hint2-${index + 1}" title="-2 min" onclick="useHint(${index + 1}, 2)">?</button>
+      <button class="pulsing" id="hint3-${index + 1}" title="-3 min" onclick="useHint(${index + 1}, 3)">?</button>
+      <span id="msg${index + 1}"></span>
+    `;
+    codesContainer.appendChild(block);
+  });
+
+  const teamRef = doc(db, "teams", teamId);
+
+  async function loadState() {
+    const snapshot = await getDoc(teamRef);
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      penaltyMinutes = data.penalty || 0;
+      timePenalty = penaltyMinutes * 60 * 1000;
+      hintLogElement.textContent = `Total time penalty: ${penaltyMinutes} minutes`;
+      (data.hints || []).forEach(hintId => {
+        const btn = document.getElementById(`hint${hintId.split("-")[1]}-${hintId.split("-")[0]}`);
+        if (btn) {
+          btn.classList.add("hint-used");
+          btn.textContent = "?";
+          btn.disabled = true;
+        }
+      });
+    }
+  }
+
+  window.useHint = async function(codeIndex, minutes) {
+    const key = `${minutes}-${codeIndex}`;
+    const hintText = hints[codeIndex][minutes];
+    alert(hintText);
+    const button = document.getElementById(`hint${minutes}-${codeIndex}`);
+    button.classList.add("hint-used");
+    button.textContent = "?";
+    button.disabled = true;
+    penaltyMinutes += minutes;
+    timePenalty = penaltyMinutes * 60 * 1000;
+    hintLogElement.textContent = `Total time penalty: ${penaltyMinutes} minutes`;
+    const snapshot = await getDoc(teamRef);
+    const usedHints = snapshot.exists() && snapshot.data().hints ? snapshot.data().hints : [];
+    await setDoc(teamRef, { penalty: penaltyMinutes, hints: [...usedHints, key] });
+  };
+
+  window.validateCode = function(index) {
+    const userInput = document.getElementById(`code${index}`).value.trim();
+    const messageElement = document.getElementById(`msg${index}`);
+    if (userInput === correctCodes[index - 1]) {
+      messageElement.textContent = "Correct";
+      document.getElementById(`code${index}`).classList.remove("error");
+      document.getElementById(`code${index}`).classList.add("success");
+      status[index - 1] = true;
+      checkAllCodes();
+    } else {
+      messageElement.textContent = "Wrong code";
+      const inputEl = document.getElementById(`code${index}`);
+      inputEl.classList.remove("success");
+      inputEl.classList.add("error", "shake");
+      setTimeout(() => inputEl.classList.remove("shake"), 400);
+      document.body.classList.add("flash-error");
+      setTimeout(() => document.body.classList.remove("flash-error"), 1000);
+    }
+  };
+
+  function checkAllCodes() {
+    if (status.every(Boolean)) {
+      document.body.classList.add("flash-success");
+      setTimeout(() => {
+        document.body.classList.remove("flash-success");
+        overlayElement.classList.add('hidden');
+        document.querySelector('iframe').style.filter = 'none';
+        endMessage.style.opacity = 1;
+      }, 1000);
+    }
+  }
+
+  let interval = setInterval(() => {
+    let now = new Date();
+    let distance = deadline - now - timePenalty;
+    if (distance <= 0) {
+      clearInterval(interval);
+      timerElement.textContent = "00:00";
+      finalMessageElement.textContent = "Time's up. Data destroyed!";
+    } else {
+      let days = Math.floor(distance / (1000 * 60 * 60 * 24));
+      let hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      let minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      let seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      let daysDisplay = days > 0 ? `${days}d ` : "";
+      timerElement.textContent = `${daysDisplay}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+  }, 1000);
+
+  loadState();
+</script>
+</body>
 </html>
