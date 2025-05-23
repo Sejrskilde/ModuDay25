@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -7,53 +8,63 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
-      authDomain: "modudag2025.firebaseapp.com",
-      projectId: "modudag2025",
-      storageBucket: "modudag2025.firebasestorage.app",
-      messagingSenderId: "1025892096437",
-      appId: "1:1025892096437:web:2b847461eab089f52c21fc"
-    };
+```
+const firebaseConfig = {
+  apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
+  authDomain: "modudag2025.firebaseapp.com",
+  projectId: "modudag2025",
+  storageBucket: "modudag2025.firebasestorage.app",
+  messagingSenderId: "1025892096437",
+  appId: "1:1025892096437:web:2b847461eab089f52c21fc"
+};
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const configRef = doc(db, "config", "global");
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const configRef = doc(db, "config", "global");
 
-    async function loadSettings() {
-      const snap = await getDoc(configRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        document.getElementById("deadline").value = data.deadline || "";
-        for (let i = 0; i < 6; i++) {
-          document.getElementById(`code${i+1}`).value = data.correctCodes?.[i] || "";
-        }
+async function loadSettings() {
+  const snap = await getDoc(configRef);
+  if (snap.exists()) {
+    const data = snap.data();
+    document.getElementById("deadline").value = data.deadline || "";
+    for (let i = 0; i < 6; i++) {
+      document.getElementById(`code${i+1}`).value = data.correctCodes?.[i] || "";
+      for (let j = 1; j <= 3; j++) {
+        document.getElementById(`hint${i+1}-${j}`).value = data.hints?.[`c${i+1}-h${j}`] || "";
       }
     }
+  }
+}
 
-    async function saveSettings(event) {
-      event.preventDefault();
-      const deadline = document.getElementById("deadline").value;
-      const codes = [];
-      for (let i = 0; i < 6; i++) {
-        codes.push(document.getElementById(`code${i+1}`).value.trim());
-      }
-      const statusEl = document.getElementById("status");
-      try {
-        await setDoc(configRef, { deadline, correctCodes: codes });
-        statusEl.textContent = "✅ Settings saved!";
-        statusEl.style.color = "lime";
-      } catch (error) {
-        console.error("Error saving settings:", error);
-        statusEl.textContent = "❌ Failed to save settings. Check connection or console.";
-        statusEl.style.color = "red";
-      }
+async function saveSettings(event) {
+  event.preventDefault();
+  const deadline = document.getElementById("deadline").value;
+  const codes = [];
+  const hints = {};
+  for (let i = 0; i < 6; i++) {
+    codes.push(document.getElementById(`code${i+1}`).value.trim());
+    for (let j = 1; j <= 3; j++) {
+      hints[`c${i+1}-h${j}`] = document.getElementById(`hint${i+1}-${j}`).value.trim();
     }
+  }
+  const statusEl = document.getElementById("status");
+  try {
+    await setDoc(configRef, { deadline, correctCodes: codes, hints });
+    statusEl.textContent = "✅ Settings saved!";
+    statusEl.style.color = "lime";
+  } catch (error) {
+    console.error("Error saving settings:", error);
+    statusEl.textContent = "❌ Failed to save settings. Check connection or console.";
+    statusEl.style.color = "red";
+  }
+}
 
-    document.addEventListener("DOMContentLoaded", () => {
-      loadSettings();
-      document.getElementById("settingsForm").addEventListener("submit", saveSettings);
-    });
+document.addEventListener("DOMContentLoaded", () => {
+  loadSettings();
+  document.getElementById("settingsForm").addEventListener("submit", saveSettings);
+});
+```
+
   </script>
   <style>
     body { font-family: sans-serif; padding: 20px; background: #111; color: #0f0; }
@@ -69,16 +80,31 @@
     <label for="deadline">Deadline (UTC):</label>
     <input type="datetime-local" id="deadline" required>
 
-    <h3>Correct Codes</h3>
-    <input type="text" id="code1" placeholder="Code 1" required>
-    <input type="text" id="code2" placeholder="Code 2" required>
-    <input type="text" id="code3" placeholder="Code 3" required>
-    <input type="text" id="code4" placeholder="Code 4" required>
-    <input type="text" id="code5" placeholder="Code 5" required>
-    <input type="text" id="code6" placeholder="Code 6" required>
+```
+<h3>Correct Codes & Hints</h3>
+<div id="codesAndHints"></div>
 
-    <button type="submit">Save Settings</button>
+<button type="submit">Save Settings</button>
+```
+
   </form>
   <p id="status"></p>
+  <script>
+    const container = document.getElementById("codesAndHints");
+    for (let i = 1; i <= 6; i++) {
+      const section = document.createElement("div");
+      section.innerHTML = `
+        <label>Code ${i}</label>
+        <input type="text" id="code${i}" placeholder="Code ${i}" required>
+        <label>Hint 1</label>
+        <input type="text" id="hint${i}-1" placeholder="Hint 1 for Code ${i}">
+        <label>Hint 2</label>
+        <input type="text" id="hint${i}-2" placeholder="Hint 2 for Code ${i}">
+        <label>Hint 3</label>
+        <input type="text" id="hint${i}-3" placeholder="Hint 3 for Code ${i}">
+      `;
+      container.appendChild(section);
+    }
+  </script>
 </body>
 </html>
