@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MODU - Compact Hints with Firebase</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
+      authDomain: "modudag2025.firebaseapp.com",
+      projectId: "modudag2025",
+      storageBucket: "modudag2025.firebasestorage.app",
+      messagingSenderId: "1025892096437",
+      appId: "1:1025892096437:web:2b847461eab089f52c21fc"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const params = new URLSearchParams(window.location.search);
+    const teamId = params.get("team") || "unknown";
+    const teamRef = doc(db, "teams", teamId);
+
+    const correctCodes = ["MODU01", "MODU02", "MODU03", "MODU04", "MODU05", "MODU06"];
+    const hints = {
+      1: { 1: "Hint 1 for Code 1", 2: "Hint 2 for Code 1", 3: "Hint 3 for Code 1" },
+      2: { 1: "Hint 1 for Code 2", 2: "Hint 2 for Code 2", 3: "Hint 3 for Code 2" },
+      3: { 1: "Hint 1 for Code 3", 2: "Hint 2 for Code 3", 3: "Hint 3 for Code 3" },
+      4: { 1: "Hint 1 for Code 4", 2: "Hint 2 for Code 4", 3: "Hint 3 for Code 4" },
+      5: { 1: "Hint 1 for Code 5", 2: "Hint 2 for Code 5", 3: "Hint 3 for Code 5" },
+      6: { 1: "Hint 1 for Code 6", 2: "Hint 2 for Code 6", 3: "Hint 3 for Code 6" }
+    };
+
+    const deadline = new Date("2025-05-22T14:30:00");
+    document.addEventListener("DOMContentLoaded", async () => {
+      document.getElementById('deadlineDisplay').textContent = deadline.toLocaleString();
+      const timerElement = document.getElementById('timer');
+      const finalMessageElement = document.getElementById('finalMessage');
+      const overlayElement = document.getElementById('overlay');
+      const codesContainer = document.getElementById('codesContainer');
+      const hintLogElement = document.getElementById('hintLog');
+
+      let timePenalty = 0;
+      let penaltyMinutes = 0;
+      const status = [false, false, false, false, false, false];
+
+      // Load or initialize team data
+      const snap = await getDoc(teamRef);
+      let data;
+      if (snap.exists()) {
+        data = snap.data();
+      } else {
+        data = { penalty: 0, hints: [] };
+        await setDoc(teamRef, data);
+      }
+
+      timePenalty = data.penalty * 60 * 1000;
+      penaltyMinutes = data.penalty;
+      hintLogElement.textContent = `Total time penalty: ${penaltyMinutes} minutes`;
+
+      // Build UI
+      correctCodes.forEach((code, index) => {
+        const block = document.createElement('div');
+        let hintButtons = '';
+        for (let i = 1; i <= 3; i++) {
+          const key = `c${index + 1}-h${i}`;
+          const used = data.hints.includes(key);
+          hintButtons += `<button class="${used ? 'hint-used' : 'pulsing'}" id="${key}" title="-${i} min" data-key="${key}" data-minutes="${i}" ${used ? 'disabled' : ''}>?</button>`;
+        }
+        block.innerHTML = `
+          <input id="code${index + 1}" placeholder="Code ${index + 1}">
+          <button onclick="validateCode(${index + 1})">Validate</button>
+          ${hintButtons}
+          <span id="msg${index + 1}"></span>
+        `;
+        codesContainer.appendChild(block);
+      });
+
+      // Start timer
+      setInterval(() => {
+        let now = new Date();
+        let distance = deadline - now - timePenalty;
+        if (distance <= 0) {
+          timerElement.textContent = "00:00";
+          finalMessageElement.textContent = "Time's up. Data destroyed!";
+        } else {
+          let days = Math.floor(distance / (1000 * 60 * 60 * 24));
+          let hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          let minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+          let seconds = Math.floor((distance % (1000 * 60)) / 1000);
+          let daysDisplay = days > 0 ? `${days}d ` : "";
+          timerElement.textContent = `${daysDisplay}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+      }, 1000);
+
+      // Validate codes
+      window.validateCode = (index) => {
+        const userInput = document.getElementById(`code${index}`).value.trim();
+        const messageElement = document.getElementById(`msg${index}`);
+        if (userInput === correctCodes[index - 1]) {
+          messageElement.textContent = "Correct";
+          status[index - 1] = true;
+          if (status.every(Boolean)) {
+            finalMessageElement.textContent = "All codes validated. Data decrypted!";
+            setTimeout(() => {
+              overlayElement.classList.add('hidden');
+              document.querySelector('iframe').style.filter = 'none';
+            }, 5000);
+          }
+        } else {
+          messageElement.textContent = "Wrong code";
+        }
+      };
+
+      // Handle hint use
+      document.querySelectorAll('button[data-key]').forEach(button => {
+        button.addEventListener('click', async () => {
+          const key = button.dataset.key;
+          const minutes = parseInt(button.dataset.minutes);
+          const hintText = hints[parseInt(key[1])][minutes];
+          alert(hintText);
+
+          timePenalty += minutes * 60 * 1000;
+          penaltyMinutes += minutes;
+          hintLogElement.textContent = `Total time penalty: ${penaltyMinutes} minutes`;
+
+          button.classList.add('hint-used');
+          button.classList.remove('pulsing');
+          button.disabled = true;
+
+          const snap = await getDoc(teamRef);
+          const data = snap.data();
+          const newHints = [...(data.hints || []), key];
+          await updateDoc(teamRef, {
+            penalty: penaltyMinutes,
+            hints: newHints
+          });
+        });
+      });
+    });
+  </script>
+  <style>
+    body { margin: 0; padding: 0; font-family: monospace; }
+    iframe { position: fixed; top: 0; left: 0; width: 100%; height: 100%; border: none; filter: blur(5px) brightness(0.5); z-index: 0; }
+    #overlay { position: relative; z-index: 1; background: rgba(0, 0, 0, 0.85); padding: 30px; border: 2px solid lime; color: lime; text-align: center; max-width: 700px; margin: 50px auto; border-radius: 10px; }
+    input { margin: 2px; padding: 3px 6px; font-size: 0.85em; }
+    button { margin: 2px; padding: 2px 5px; font-size: 0.75em; cursor: pointer; }
+    .hint-used { opacity: 0.5; pointer-events: none; }
+    .hidden { opacity: 0; pointer-events: none; }
+    #hintLog { margin-top: 20px; color: yellow; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+    .pulsing { animation: pulse 1.5s infinite; }
+  </style>
+</head>
+<body>
+  <iframe src="https://www.moduvalves.com"></iframe>
+  <div id="overlay">
+    <h1>RedBear Hackers</h1>
+    <p>Enter all six codes to decrypt the data before the timer runs out. Hints cost time!</p>
+    <p><strong>Deadline:</strong> <span id="deadlineDisplay"></span></p>
+    <h2 id="timer">--:--</h2>
+    <div id="codesContainer"></div>
+    <div id="hintLog">Total time penalty: 0 minutes</div>
+    <p id="finalMessage"></p>
+  </div>
+</body>
+</html>
