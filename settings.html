@@ -35,6 +35,7 @@
               document.getElementById(`hint${i+1}-${j}`).value = hints[`c${i+1}-h${j}`] || "";
             }
           }
+          document.getElementById("decryptionKey").value = data.decryptionKey || "";
         }
       } catch (err) {
         console.error("Error loading settings:", err);
@@ -52,10 +53,11 @@
           hints[`c${i+1}-h${j}`] = document.getElementById(`hint${i+1}-${j}`).value.trim();
         }
       }
-      console.log("💾 Saving config:", { deadline, correctCodes: codes, hints });
+      const decryptionKey = document.getElementById("decryptionKey").value.trim();
+      console.log("💾 Saving config:", { deadline, correctCodes: codes, hints, decryptionKey });
       const statusEl = document.getElementById("status");
       try {
-        await setDoc(configRef, { deadline, correctCodes: codes, hints }, { merge: true });
+        await setDoc(configRef, { deadline, correctCodes: codes, hints, decryptionKey }, { merge: true });
         statusEl.textContent = "✅ Settings saved!";
         statusEl.style.color = "lime";
       } catch (error) {
@@ -82,7 +84,7 @@
     }
     .code-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
     .code-row input[type="text"] { flex: 1; min-width: 120px; }
-    .hint-label { font-size: 0.9em; }
+    .hint-label { font-size: 0.9em; margin-left: 4px; }
     button { margin-top: 20px; padding: 10px 20px; font-size: 1em; background: #0f0; color: #000; border: none; cursor: pointer; }
     #status { margin-top: 15px; font-weight: bold; }
   </style>
@@ -132,6 +134,8 @@
         <span class="hint-label">Hint 3:</span><input type="text" id="hint6-3" placeholder="Hint 3" required>
       </div>
     </div>
+    <h2>Decryption Key</h2>
+    <input type="text" id="decryptionKey" placeholder="Enter decryption key" required>
     <button type="submit">Save Settings</button>
   </form>
   <p id="status"></p>
