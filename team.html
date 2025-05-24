@@ -1,9 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>MODU - Team View (Dynamic Settings)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MODU - Team View (Responsive)</title>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
@@ -51,21 +51,21 @@
       codesContainer.innerHTML = "";
       for (let i = 0; i < 6; i++) {
         const block = document.createElement("div");
+        block.className = "code-block";
         let hintButtons = "";
         for (let j = 1; j <= 3; j++) {
           const key = `c${i+1}-h${j}`;
-          hintButtons += `<button class="pulsing" id="${key}" title="-${j} min" data-key="${key}" data-minutes="${j}">?</button>`;
+          hintButtons += `<button class="hint-btn pulsing" id="${key}" title="-${j} min" data-key="${key}" data-minutes="${j}">?</button>`;
         }
         block.innerHTML = `
-          <input id="code${i+1}" placeholder="Code ${i+1}">
-          <button onclick="validateCode(${i+1})">Validate</button>
+          <input id="code${i+1}" class="code-input" placeholder="Code ${i+1}">
+          <button class="validate-btn" onclick="validateCode(${i+1})">Validate</button>
           ${hintButtons}
-          <span id="msg${i+1}"></span>
+          <span id="msg${i+1}" class="msg"></span>
         `;
         codesContainer.appendChild(block);
       }
-
-      document.querySelectorAll("button[data-key]").forEach(button => {
+      document.querySelectorAll(".hint-btn").forEach(button => {
         button.addEventListener("click", async () => {
           const key = button.dataset.key;
           const minutes = parseInt(button.dataset.minutes);
@@ -75,17 +75,17 @@
           document.getElementById("hintLog").textContent = `Total time penalty: ${penaltyMinutes} minutes`;
           button.classList.add("hint-used");
           button.disabled = true;
-          const snapshot = await getDoc(teamRef);
-          const usedHints = snapshot.exists() && snapshot.data().hints ? snapshot.data().hints : [];
+          const snap = await getDoc(teamRef);
+          const usedHints = snap.exists() && snap.data().hints ? snap.data().hints : [];
           await setDoc(teamRef, { penalty: penaltyMinutes, hints: [...usedHints, key] });
         });
       });
     }
 
     async function loadTeamState() {
-      const snapshot = await getDoc(teamRef);
-      if (snapshot.exists()) {
-        const data = snapshot.data();
+      const snap = await getDoc(teamRef);
+      if (snap.exists()) {
+        const data = snap.data();
         penaltyMinutes = data.penalty || 0;
         timePenalty = penaltyMinutes * 60 * 1000;
         document.getElementById("hintLog").textContent = `Total time penalty: ${penaltyMinutes} minutes`;
@@ -110,50 +110,51 @@
         } else {
           const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
           const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-          timerEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+          timerEl.textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
         }
       }, 1000);
     }
 
     window.validateCode = (index) => {
       const input = document.getElementById(`code${index}`);
-      const message = document.getElementById(`msg${index}`);
-      if (input.value.trim() === correctCodes[index - 1]) {
-        message.textContent = "Correct";
-        input.classList.remove("error");
+      const msg = document.getElementById(`msg${index}`);
+      if (input.value.trim() === correctCodes[index-1]) {
+        msg.textContent = "Correct";
         input.classList.add("success");
-        status[index - 1] = true;
+        status[index-1] = true;
         if (status.every(Boolean)) {
           document.getElementById("finalMessage").textContent = "💾 DATA RECOVERED - Decryption key created \"MAKE IT BETTER.\"";
           document.body.classList.add("flash-success");
         }
       } else {
-        message.textContent = "Wrong code";
+        msg.textContent = "Wrong code";
         input.classList.add("error", "shake");
-        setTimeout(() => input.classList.remove("shake"), 500);
+        setTimeout(()=>input.classList.remove("shake"),1000);
+        document.body.classList.add("flash-error");
+        setTimeout(()=>document.body.classList.remove("flash-error"),1000);
       }
     };
 
     document.addEventListener("DOMContentLoaded", loadConfig);
   </script>
   <style>
-    body { font-family: monospace; background: black; color: lime; text-align: center; padding: 20px; }
-    input { margin: 5px; padding: 5px; }
-    button { margin: 5px; }
-    .hint-used { opacity: 0.4; pointer-events: none; }
-    .success { border: 2px solid lime; background-color: #002200; }
-    .error { border: 2px solid red; background-color: #220000; color: red; }
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-4px); }
-      75% { transform: translateX(4px); }
-    }
-    .shake { animation: shake 0.5s ease-in-out; }
-    .flash-success { animation: green-flash 1s ease-in-out; }
-    @keyframes green-flash {
-      0% { background-color: rgba(0,255,0,0.3); }
-      100% { background-color: transparent; }
-    }
+    body { margin:0; padding:20px; font-family:monospace; background:black; color:lime; }
+    h1, p, h2 { text-align:center; }
+    #codesContainer { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:20px 0; }
+    .code-block { display:flex; flex-direction:column; align-items:center; width:45%; min-width:200px; }
+    .code-input, .validate-btn, .hint-btn { font-size:1.2em; margin:5px; padding:10px; width: 100%; box-sizing: border-box; }
+    .hint-btn { width:auto; max-width: 3em; }
+    .hint-used { opacity:0.4; pointer-events:none; }
+    .success { border:3px solid lime; }
+    .error { border:3px solid red; }
+    @keyframes shake {0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+    .shake { animation:shake 0.5s ease-in-out; }
+    @keyframes red-flash {0%{background:rgba(255,0,0,0.3);}100%{background:transparent;}}
+    .flash-error { animation:red-flash 1s ease-in-out; }
+    @keyframes green-flash {0%{background:rgba(0,255,0,0.3);}100%{background:transparent;}}
+    .flash-success { animation:green-flash 1s ease-in-out; }
+    #hintLog, #finalMessage { text-align:center; font-size:1.2em; margin-top:10px; }
+    input, button { width: 80%; max-width: 300px; }
   </style>
 </head>
 <body>
