@@ -8,7 +8,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
       authDomain: "modudag2025.firebaseapp.com",
@@ -30,55 +29,52 @@
     let timePenalty = 0;
     let penaltyMinutes = 0;
     let status = [false, false, false, false, false, false];
+    let buildBtn;
 
-    // Load global config
     async function loadConfig() {
       const snap = await getDoc(configRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        correctCodes = data.correctCodes || [];
-        hints = data.hints || {};
-        deadline = new Date(data.deadline);
-        document.getElementById("deadlineDisplay").textContent = deadline.toLocaleString();
-        buildUI();
-        await loadTeamState();
-        startTimer();
-      } else {
+      if (!snap.exists()) {
         alert("No config found.");
+        return;
       }
+      const data = snap.data();
+      correctCodes = data.correctCodes || [];
+      hints = data.hints || {};
+      deadline = new Date(data.deadline);
+      document.getElementById("deadlineDisplay").textContent = deadline.toLocaleString();
+      buildUI();
+      await loadTeamState();
+      buildBtn = document.getElementById("buildKeyBtn");
+      buildBtn.disabled = true;
+      buildBtn.addEventListener("click", handleBuildKey);
+      startTimer();
     }
 
-    // Build UI and attach hint logic
     function buildUI() {
       const codesContainer = document.getElementById("codesContainer");
       codesContainer.innerHTML = "";
       for (let i = 0; i < 6; i++) {
         const block = document.createElement("div");
         block.className = "code-block";
-        let hintButtons = `<div class="hint-container">`;
+        let hintHTML = '<div class="hint-container">';
         for (let j = 1; j <= 3; j++) {
           const key = `c${i+1}-h${j}`;
-          hintButtons += `<button class="hint-btn pulsing" id="${key}" data-key="${key}" data-mins="${j}" title="-${j} min">?</button>`;
+          hintHTML += `<button class="hint-btn" id="${key}" data-key="${key}" data-mins="${j}" title="-${j} min">?</button>`;
         }
-        hintButtons += `</div>`;
+        hintHTML += '</div>';
         block.innerHTML = `
           <input id="code${i+1}" class="code-input" placeholder="Code ${i+1}">
           <button class="validate-btn" onclick="validateCode(${i+1})">Validate</button>
-          ${hintButtons}
+          ${hintHTML}
           <span id="msg${i+1}" class="msg"></span>
         `;
         codesContainer.appendChild(block);
-        // Initially disable hint2 & hint3
         document.getElementById(`c${i+1}-h2`).disabled = true;
         document.getElementById(`c${i+1}-h3`).disabled = true;
       }
-      // Attach handlers
       document.querySelectorAll(".hint-btn").forEach(button => {
         button.addEventListener("click", async () => {
-          if (!confirm("Du er ved at bruge et hint - det koster tid! Er du sikker?")) {
-            return;
-          }
-
+          if (!confirm("Du er ved at bruge et hint - det koster tid! Er du sikker?")) return;
           const key = button.dataset.key;
           const mins = parseInt(button.dataset.mins);
           alert(hints[key] || "No hint configured.");
@@ -90,44 +86,35 @@
           const snap = await getDoc(teamRef);
           const used = snap.exists() && snap.data().hints ? snap.data().hints : [];
           await setDoc(teamRef, { penalty: penaltyMinutes, hints: [...used, key] });
-          // Enable next hint in order
-          const parts = key.split("-");
-          const codeIndex = parts[0].substring(1);
-          const hintNum = parseInt(parts[1].substring(1));
+          const codeIndex = parseInt(key.charAt(1));
+          const hintNum = parseInt(key.charAt(4));
           if (hintNum === 1) document.getElementById(`c${codeIndex}-h2`).disabled = false;
           if (hintNum === 2) document.getElementById(`c${codeIndex}-h3`).disabled = false;
         });
       });
     }
 
-    // Load team state and set hint button status
     async function loadTeamState() {
       const snap = await getDoc(teamRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        penaltyMinutes = data.penalty || 0;
-        timePenalty = penaltyMinutes * 60 * 1000;
-        document.getElementById("hintLog").textContent = `Total time penalty: ${penaltyMinutes} minutes`;
-        const used = data.hints || [];
-        for (let i = 0; i < 6; i++) {
-          for (let j = 1; j <= 3; j++) {
-            const key = `c${i+1}-h${j}`;
-            const btn = document.getElementById(key);
-            if (used.includes(key)) {
-              btn.classList.add("hint-used");
-              btn.disabled = true;
-            } else {
-              // enforce ordering
-              if (j === 1) btn.disabled = false;
-              if (j === 2) btn.disabled = !used.includes(`c${i+1}-h1`);
-              if (j === 3) btn.disabled = !(used.includes(`c${i+1}-h1`) && used.includes(`c${i+1}-h2`));
-            }
+      if (!snap.exists()) return;
+      const data = snap.data();
+      penaltyMinutes = data.penalty || 0;
+      timePenalty = penaltyMinutes * 60 * 1000;
+      document.getElementById("hintLog").textContent = `Total time penalty: ${penaltyMinutes} minutes`;
+      const used = data.hints || [];
+      for (let i = 0; i < 6; i++) {
+        for (let j = 1; j <= 3; j++) {
+          const key = `c${i+1}-h${j}`;
+          const btn = document.getElementById(key);
+          btn.disabled = (j > 1 && !used.includes(`c${i+1}-h${j-1}`));
+          if (used.includes(key)) {
+            btn.classList.add("hint-used");
+            btn.disabled = true;
           }
         }
       }
     }
 
-    // Timer logic
     function startTimer() {
       const timerEl = document.getElementById("timer");
       setInterval(() => {
@@ -136,15 +123,16 @@
         if (dist <= 0) {
           timerEl.textContent = "00:00";
           document.getElementById("finalMessage").textContent = "Time's up. Data destroyed!";
+          buildBtn.disabled = true;
         } else {
           const m = Math.floor((dist % (1000*60*60)) / (1000*60));
           const s = Math.floor((dist % (1000*60)) / 1000);
           timerEl.textContent = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+          buildBtn.disabled = !(status.every(Boolean) && dist > 0);
         }
       }, 1000);
     }
 
-    // Validate code
     window.validateCode = (index) => {
       const input = document.getElementById(`code${index}`);
       const msg = document.getElementById(`msg${index}`);
@@ -153,11 +141,6 @@
         input.classList.remove("error");
         input.classList.add("success");
         status[index-1] = true;
-        if (status.every(Boolean)) {
-          document.getElementById("buildKeyBtn").disabled = false;
-          document.getElementById("finalMessage").textContent = "💾 DATA RECOVERED - Decryption key created \"MAKE IT BETTER.\"";
-          document.body.classList.add("flash-success");
-        }
       } else {
         msg.textContent = "Wrong code";
         input.classList.add("error", "shake");
@@ -167,23 +150,26 @@
       }
     };
 
-    document.addEventListener("DOMContentLoaded", loadConfig);
-    // Build decryption key button handler
-    document.addEventListener("DOMContentLoaded", () => {
-      const buildBtn = document.getElementById("buildKeyBtn");
-      buildBtn.addEventListener("click", () => {
+    function handleBuildKey() {
+      const now = new Date();
+      if (deadline - now - timePenalty <= 0) {
+        alert("Error - time run out!!");
+        document.getElementById("finalMessage").textContent = "Error - time run out!!";
+      } else if (status.every(Boolean)) {
         alert('Decryption key created "Make It Better"');
         document.getElementById("finalMessage").textContent = 'Decryption key created "Make It Better"';
-      });
-    });
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", loadConfig);
   </script>
   <style>
     body { margin:0; padding:20px; font-family:monospace; background:black; color:lime; }
     h1, p, h2 { text-align:center; }
     #codesContainer { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:20px 0; }
     .code-block { display:flex; flex-direction:column; align-items:center; width:45%; min-width:200px; }
-    .code-input, .validate-btn, .hint-btn { font-size:1.2em; margin:5px; padding:10px; width:100%; box-sizing:border-box; }
-    .hint-btn { width:auto; max-width:3em; }
+    .code-input, .validate-btn, #buildKeyBtn { font-size:1.2em; margin:5px; padding:10px; width:100%; box-sizing:border-box; }
+    .hint-btn { font-size:1.2em; margin:5px; padding:10px; width:auto; max-width:3em; }
     .hint-container { display:flex; justify-content:center; gap:0.5em; margin-top:0.5em; }
     .hint-used { opacity:0.4; pointer-events:none; }
     .success { border:3px solid lime; }
@@ -195,6 +181,7 @@
     @keyframes green-flash {0%{background:rgba(0,255,0,0.3);}100%{background:transparent;}}
     .flash-success { animation:green-flash 1s ease-in-out; }
     #hintLog, #finalMessage { text-align:center; font-size:1.2em; margin-top:10px; }
+    #buildKeyBtn { font-size:1.2em; padding:10px; margin:10px auto; display:block; }
   </style>
 </head>
 <body>
