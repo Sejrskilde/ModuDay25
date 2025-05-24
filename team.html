@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <title>MODU - Team View (Dynamic Settings)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MODU - Team View (Responsive)</title>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
       authDomain: "modudag2025.firebaseapp.com",
@@ -30,6 +31,7 @@
     let penaltyMinutes = 0;
     let status = [false, false, false, false, false, false];
 
+    // Load global config
     async function loadConfig() {
       const snap = await getDoc(configRef);
       if (snap.exists()) {
@@ -39,13 +41,14 @@
         deadline = new Date(data.deadline);
         document.getElementById("deadlineDisplay").textContent = deadline.toLocaleString();
         buildUI();
-        loadTeamState();
+        await loadTeamState();
         startTimer();
       } else {
         alert("No config found.");
       }
     }
 
+    // Build UI and attach hint logic
     function buildUI() {
       const codesContainer = document.getElementById("codesContainer");
       codesContainer.innerHTML = "";
@@ -55,7 +58,7 @@
         let hintButtons = `<div class="hint-container">`;
         for (let j = 1; j <= 3; j++) {
           const key = `c${i+1}-h${j}`;
-          hintButtons += `<button class="hint-btn pulsing" id="${key}" title="-${j} min" data-key="${key}" data-minutes="${j}">?</button>`;
+          hintButtons += `<button class="hint-btn pulsing" id="${key}" data-key="${key}" data-mins="${j}" title="-${j} min">?</button>`;
         }
         hintButtons += `</div>`;
         block.innerHTML = `
@@ -65,24 +68,35 @@
           <span id="msg${i+1}" class="msg"></span>
         `;
         codesContainer.appendChild(block);
+        // Initially disable hint2 & hint3
+        document.getElementById(`c${i+1}-h2`).disabled = true;
+        document.getElementById(`c${i+1}-h3`).disabled = true;
       }
+      // Attach handlers
       document.querySelectorAll(".hint-btn").forEach(button => {
         button.addEventListener("click", async () => {
           const key = button.dataset.key;
-          const minutes = parseInt(button.dataset.minutes);
+          const mins = parseInt(button.dataset.mins);
           alert(hints[key] || "No hint configured.");
-          timePenalty += minutes * 60 * 1000;
-          penaltyMinutes += minutes;
+          timePenalty += mins * 60 * 1000;
+          penaltyMinutes += mins;
           document.getElementById("hintLog").textContent = `Total time penalty: ${penaltyMinutes} minutes`;
           button.classList.add("hint-used");
           button.disabled = true;
           const snap = await getDoc(teamRef);
-          const usedHints = snap.exists() && snap.data().hints ? snap.data().hints : [];
-          await setDoc(teamRef, { penalty: penaltyMinutes, hints: [...usedHints, key] });
+          const used = snap.exists() && snap.data().hints ? snap.data().hints : [];
+          await setDoc(teamRef, { penalty: penaltyMinutes, hints: [...used, key] });
+          // Enable next hint in order
+          const parts = key.split("-");
+          const codeIndex = parts[0].substring(1);
+          const hintNum = parseInt(parts[1].substring(1));
+          if (hintNum === 1) document.getElementById(`c${codeIndex}-h2`).disabled = false;
+          if (hintNum === 2) document.getElementById(`c${codeIndex}-h3`).disabled = false;
         });
       });
     }
 
+    // Load team state and set hint button status
     async function loadTeamState() {
       const snap = await getDoc(teamRef);
       if (snap.exists()) {
@@ -90,32 +104,43 @@
         penaltyMinutes = data.penalty || 0;
         timePenalty = penaltyMinutes * 60 * 1000;
         document.getElementById("hintLog").textContent = `Total time penalty: ${penaltyMinutes} minutes`;
-        (data.hints || []).forEach(h => {
-          const btn = document.getElementById(h);
-          if (btn) {
-            btn.classList.add("hint-used");
-            btn.disabled = true;
+        const used = data.hints || [];
+        for (let i = 0; i < 6; i++) {
+          for (let j = 1; j <= 3; j++) {
+            const key = `c${i+1}-h${j}`;
+            const btn = document.getElementById(key);
+            if (used.includes(key)) {
+              btn.classList.add("hint-used");
+              btn.disabled = true;
+            } else {
+              // enforce ordering
+              if (j === 1) btn.disabled = false;
+              if (j === 2) btn.disabled = !used.includes(`c${i+1}-h1`);
+              if (j === 3) btn.disabled = !(used.includes(`c${i+1}-h1`) && used.includes(`c${i+1}-h2`));
+            }
           }
-        });
+        }
       }
     }
 
+    // Timer logic
     function startTimer() {
       const timerEl = document.getElementById("timer");
       setInterval(() => {
         const now = new Date();
-        const distance = deadline - now - timePenalty;
-        if (distance <= 0) {
+        const dist = deadline - now - timePenalty;
+        if (dist <= 0) {
           timerEl.textContent = "00:00";
           document.getElementById("finalMessage").textContent = "Time's up. Data destroyed!";
         } else {
-          const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-          timerEl.textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+          const m = Math.floor((dist % (1000*60*60)) / (1000*60));
+          const s = Math.floor((dist % (1000*60)) / 1000);
+          timerEl.textContent = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
         }
       }, 1000);
     }
 
+    // Validate code
     window.validateCode = (index) => {
       const input = document.getElementById(`code${index}`);
       const msg = document.getElementById(`msg${index}`);
@@ -130,9 +155,9 @@
       } else {
         msg.textContent = "Wrong code";
         input.classList.add("error", "shake");
-        setTimeout(()=>input.classList.remove("shake"),1000);
+        setTimeout(() => input.classList.remove("shake"), 1000);
         document.body.classList.add("flash-error");
-        setTimeout(()=>document.body.classList.remove("flash-error"),1000);
+        setTimeout(() => document.body.classList.remove("flash-error"), 1000);
       }
     };
 
@@ -143,8 +168,9 @@
     h1, p, h2 { text-align:center; }
     #codesContainer { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:20px 0; }
     .code-block { display:flex; flex-direction:column; align-items:center; width:45%; min-width:200px; }
-    .code-input, .validate-btn, .hint-btn { font-size:1.2em; margin:5px; padding:10px; width: 100%; box-sizing: border-box; }
-    .hint-btn { width:auto; max-width: 3em; }
+    .code-input, .validate-btn, .hint-btn { font-size:1.2em; margin:5px; padding:10px; width:100%; box-sizing:border-box; }
+    .hint-btn { width:auto; max-width:3em; }
+    .hint-container { display:flex; justify-content:center; gap:0.5em; margin-top:0.5em; }
     .hint-used { opacity:0.4; pointer-events:none; }
     .success { border:3px solid lime; }
     .error { border:3px solid red; }
@@ -155,18 +181,6 @@
     @keyframes green-flash {0%{background:rgba(0,255,0,0.3);}100%{background:transparent;}}
     .flash-success { animation:green-flash 1s ease-in-out; }
     #hintLog, #finalMessage { text-align:center; font-size:1.2em; margin-top:10px; }
-    input, button { width: 80%; max-width: 300px; }
-  
-    .hint-container {
-      display: flex;
-      justify-content: center;
-      gap: 0.5em;
-      margin-top: 0.5em;
-    }
-    .hint-btn {
-      flex: 0 0 auto;
-    }
-
   </style>
 </head>
 <body>
