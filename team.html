@@ -1,9 +1,160 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>MODU - Team View (Dynamic Settings)</title>
-  <!-- Script content omitted for brevity -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
+      authDomain: "modudag2025.firebaseapp.com",
+      projectId: "modudag2025",
+      storageBucket: "modudag2025.firebasestorage.app",
+      messagingSenderId: "1025892096437",
+      appId: "1:1025892096437:web:2b847461eab089f52c21fc"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const teamId = new URLSearchParams(window.location.search).get("team") || "demo";
+    const teamRef = doc(db, "teams", teamId);
+    const configRef = doc(db, "config", "global");
+
+    let correctCodes = [];
+    let hints = {};
+    let deadline;
+    let timePenalty = 0;
+    let penaltyMinutes = 0;
+    let status = [false, false, false, false, false, false];
+
+    async function loadConfig() {
+      const snap = await getDoc(configRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        correctCodes = data.correctCodes || [];
+        hints = data.hints || {};
+        deadline = new Date(data.deadline);
+        document.getElementById("deadlineDisplay").textContent = deadline.toLocaleString();
+        buildUI();
+        loadTeamState();
+        startTimer();
+      } else {
+        alert("No config found.");
+      }
+    }
+
+    function buildUI() {
+      const codesContainer = document.getElementById("codesContainer");
+      codesContainer.innerHTML = "";
+      for (let i = 0; i < 6; i++) {
+        const block = document.createElement("div");
+        let hintButtons = "";
+        for (let j = 1; j <= 3; j++) {
+          const key = `c${i+1}-h${j}`;
+          hintButtons += `<button class="pulsing" id="${key}" title="-${j} min" data-key="${key}" data-minutes="${j}">?</button>`;
+        }
+        block.innerHTML = `
+          <input id="code${i+1}" placeholder="Code ${i+1}">
+          <button onclick="validateCode(${i+1})">Validate</button>
+          ${hintButtons}
+          <span id="msg${i+1}"></span>
+        `;
+        codesContainer.appendChild(block);
+      }
+
+      document.querySelectorAll("button[data-key]").forEach(button => {
+        button.addEventListener("click", async () => {
+          const key = button.dataset.key;
+          const minutes = parseInt(button.dataset.minutes);
+          alert(hints[key] || "No hint configured.");
+          timePenalty += minutes * 60 * 1000;
+          penaltyMinutes += minutes;
+          document.getElementById("hintLog").textContent = `Total time penalty: ${penaltyMinutes} minutes`;
+          button.classList.add("hint-used");
+          button.disabled = true;
+          const snapshot = await getDoc(teamRef);
+          const usedHints = snapshot.exists() && snapshot.data().hints ? snapshot.data().hints : [];
+          await setDoc(teamRef, { penalty: penaltyMinutes, hints: [...usedHints, key] });
+        });
+      });
+    }
+
+    async function loadTeamState() {
+      const snapshot = await getDoc(teamRef);
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        penaltyMinutes = data.penalty || 0;
+        timePenalty = penaltyMinutes * 60 * 1000;
+        document.getElementById("hintLog").textContent = `Total time penalty: ${penaltyMinutes} minutes`;
+        (data.hints || []).forEach(h => {
+          const btn = document.getElementById(h);
+          if (btn) {
+            btn.classList.add("hint-used");
+            btn.disabled = true;
+          }
+        });
+      }
+    }
+
+    function startTimer() {
+      const timerEl = document.getElementById("timer");
+      setInterval(() => {
+        const now = new Date();
+        const distance = deadline - now - timePenalty;
+        if (distance <= 0) {
+          timerEl.textContent = "00:00";
+          document.getElementById("finalMessage").textContent = "Time's up. Data destroyed!";
+        } else {
+          const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+          timerEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+      }, 1000);
+    }
+
+    window.validateCode = (index) => {
+      const input = document.getElementById(`code${index}`);
+      const message = document.getElementById(`msg${index}`);
+      if (input.value.trim() === correctCodes[index - 1]) {
+        message.textContent = "Correct";
+        input.classList.remove("error");
+        input.classList.add("success");
+        status[index - 1] = true;
+        if (status.every(Boolean)) {
+          document.getElementById("finalMessage").textContent = "💾 DATA RECOVERED - Decryption key created \"MAKE IT BETTER.\"";
+          document.body.classList.add("flash-success");
+        }
+      } else {
+        message.textContent = "Wrong code";
+        input.classList.add("error", "shake");
+        setTimeout(() => input.classList.remove("shake"), 500);
+      }
+    };
+
+    document.addEventListener("DOMContentLoaded", loadConfig);
+  </script>
+  <style>
+    body { font-family: monospace; background: black; color: lime; text-align: center; padding: 20px; }
+    input { margin: 5px; padding: 5px; }
+    button { margin: 5px; }
+    .hint-used { opacity: 0.4; pointer-events: none; }
+    .success { border: 2px solid lime; background-color: #002200; }
+    .error { border: 2px solid red; background-color: #220000; color: red; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+    .shake { animation: shake 0.5s ease-in-out; }
+    .flash-success { animation: green-flash 1s ease-in-out; }
+    @keyframes green-flash {
+      0% { background-color: rgba(0,255,0,0.3); }
+      100% { background-color: transparent; }
+    }
+  </style>
 </head>
 <body>
   <h1>MODU Hacker Game</h1>
