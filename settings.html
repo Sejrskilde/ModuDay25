@@ -1,77 +1,90 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>ModuDay25 Settings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-```
-const firebaseConfig = {
-  apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
-  authDomain: "modudag2025.firebaseapp.com",
-  projectId: "modudag2025",
-  storageBucket: "modudag2025.firebasestorage.app",
-  messagingSenderId: "1025892096437",
-  appId: "1:1025892096437:web:2b847461eab089f52c21fc"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
+      authDomain: "modudag2025.firebaseapp.com",
+      projectId: "modudag2025",
+      storageBucket: "modudag2025.firebasestorage.app",
+      messagingSenderId: "1025892096437",
+      appId: "1:1025892096437:web:2b847461eab089f52c21fc"
+    };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const configRef = doc(db, "config", "global");
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const configRef = doc(db, "config", "global");
 
-async function loadSettings() {
-  const snap = await getDoc(configRef);
-  if (snap.exists()) {
-    const data = snap.data();
-    document.getElementById("deadline").value = data.deadline || "";
-    for (let i = 0; i < 6; i++) {
-      document.getElementById(`code${i+1}`).value = data.correctCodes?.[i] || "";
-      for (let j = 1; j <= 3; j++) {
-        document.getElementById(`hint${i+1}-${j}`).value = data.hints?.[`c${i+1}-h${j}`] || "";
+    async function loadSettings() {
+      try {
+        const snap = await getDoc(configRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          document.getElementById("deadline").value = data.deadline || "";
+          const codes = data.correctCodes || [];
+          const hints = data.hints || {};
+          for (let i = 0; i < 6; i++) {
+            document.getElementById(`code${i+1}`).value = codes[i] || "";
+            for (let j = 1; j <= 3; j++) {
+              document.getElementById(`hint${i+1}-${j}`).value = hints[`c${i+1}-h${j}`] || "";
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error loading settings:", err);
       }
     }
-  }
-}
 
-async function saveSettings(event) {
-  event.preventDefault();
-  const deadline = document.getElementById("deadline").value;
-  const codes = [];
-  const hints = {};
-  for (let i = 0; i < 6; i++) {
-    codes.push(document.getElementById(`code${i+1}`).value.trim());
-    for (let j = 1; j <= 3; j++) {
-      hints[`c${i+1}-h${j}`] = document.getElementById(`hint${i+1}-${j}`).value.trim();
+    async function saveSettings(event) {
+      event.preventDefault();
+      const deadline = document.getElementById("deadline").value;
+      const codes = [];
+      const hints = {};
+      for (let i = 0; i < 6; i++) {
+        codes.push(document.getElementById(`code${i+1}`).value.trim());
+        for (let j = 1; j <= 3; j++) {
+          hints[`c${i+1}-h${j}`] = document.getElementById(`hint${i+1}-${j}`).value.trim();
+        }
+      }
+      console.log("💾 Saving config:", { deadline, correctCodes: codes, hints });
+      const statusEl = document.getElementById("status");
+      try {
+        await setDoc(configRef, { deadline, correctCodes: codes, hints }, { merge: true });
+        statusEl.textContent = "✅ Settings saved!";
+        statusEl.style.color = "lime";
+      } catch (error) {
+        console.error("❌ Error saving settings:", error);
+        statusEl.textContent = `❌ Failed to save: ${error.message || error.code}`;
+        statusEl.style.color = "red";
+      }
     }
-  }
-  const statusEl = document.getElementById("status");
-  try {
-    await setDoc(configRef, { deadline, correctCodes: codes, hints });
-    statusEl.textContent = "✅ Settings saved!";
-    statusEl.style.color = "lime";
-  } catch (error) {
-    console.error("Error saving settings:", error);
-    statusEl.textContent = "❌ Failed to save settings. Check connection or console.";
-    statusEl.style.color = "red";
-  }
-}
 
-document.addEventListener("DOMContentLoaded", () => {
-  loadSettings();
-  document.getElementById("settingsForm").addEventListener("submit", saveSettings);
-});
-```
-
+    document.addEventListener("DOMContentLoaded", () => {
+      loadSettings();
+      document.getElementById("settingsForm").addEventListener("submit", saveSettings);
+    });
   </script>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #111; color: #0f0; }
-    label, input { display: block; margin: 10px 0; font-size: 1em; }
-    input[type="text"], input[type="datetime-local"] { width: 300px; padding: 5px; font-size: 1em; }
-    button { padding: 10px 20px; font-size: 1em; margin-top: 20px; cursor: pointer; }
-    #status { margin-top: 20px; font-weight: bold; }
+    body { font-family: sans-serif; background: #111; color: #0f0; padding: 20px; }
+    h1 { text-align: center; }
+    form { max-width: 700px; margin: auto; }
+    label { display: block; margin-top: 15px; font-weight: bold; }
+    input[type="datetime-local"], input[type="text"] {
+      background: #222; border: 1px solid #0f0; color: #0f0;
+      width: 100%; padding: 8px; font-size: 1em; margin-top: 5px;
+      box-sizing: border-box;
+    }
+    .code-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+    .code-row input[type="text"] { flex: 1; min-width: 120px; }
+    .hint-label { font-size: 0.9em; }
+    button { margin-top: 20px; padding: 10px 20px; font-size: 1em; background: #0f0; color: #000; border: none; cursor: pointer; }
+    #status { margin-top: 15px; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -80,32 +93,47 @@ document.addEventListener("DOMContentLoaded", () => {
     <label for="deadline">Deadline (UTC):</label>
     <input type="datetime-local" id="deadline" required>
 
-```
-<h3>Correct Codes & Hints</h3>
-<div id="codesAndHints"></div>
-
-<button type="submit">Save Settings</button>
-```
-
+    <h2>Codes & Hints</h2>
+    <div>
+      <div class="code-row">
+        <input type="text" id="code1" placeholder="Code 1" required>
+        <span class="hint-label">Hint 1:</span><input type="text" id="hint1-1" placeholder="Hint 1" required>
+        <span class="hint-label">Hint 2:</span><input type="text" id="hint1-2" placeholder="Hint 2" required>
+        <span class="hint-label">Hint 3:</span><input type="text" id="hint1-3" placeholder="Hint 3" required>
+      </div>
+      <div class="code-row">
+        <input type="text" id="code2" placeholder="Code 2" required>
+        <span class="hint-label">Hint 1:</span><input type="text" id="hint2-1" placeholder="Hint 1" required>
+        <span class="hint-label">Hint 2:</span><input type="text" id="hint2-2" placeholder="Hint 2" required>
+        <span class="hint-label">Hint 3:</span><input type="text" id="hint2-3" placeholder="Hint 3" required>
+      </div>
+      <div class="code-row">
+        <input type="text" id="code3" placeholder="Code 3" required>
+        <span class="hint-label">Hint 1:</span><input type="text" id="hint3-1" placeholder="Hint 1" required>
+        <span class="hint-label">Hint 2:</span><input type="text" id="hint3-2" placeholder="Hint 2" required>
+        <span class="hint-label">Hint 3:</span><input type="text" id="hint3-3" placeholder="Hint 3" required>
+      </div>
+      <div class="code-row">
+        <input type="text" id="code4" placeholder="Code 4" required>
+        <span class="hint-label">Hint 1:</span><input type="text" id="hint4-1" placeholder="Hint 1" required>
+        <span class="hint-label">Hint 2:</span><input type="text" id="hint4-2" placeholder="Hint 2" required>
+        <span class="hint-label">Hint 3:</span><input type="text" id="hint4-3" placeholder="Hint 3" required>
+      </div>
+      <div class="code-row">
+        <input type="text" id="code5" placeholder="Code 5" required>
+        <span class="hint-label">Hint 1:</span><input type="text" id="hint5-1" placeholder="Hint 1" required>
+        <span class="hint-label">Hint 2:</span><input type="text" id="hint5-2" placeholder="Hint 2" required>
+        <span class="hint-label">Hint 3:</span><input type="text" id="hint5-3" placeholder="Hint 3" required>
+      </div>
+      <div class="code-row">
+        <input type="text" id="code6" placeholder="Code 6" required>
+        <span class="hint-label">Hint 1:</span><input type="text" id="hint6-1" placeholder="Hint 1" required>
+        <span class="hint-label">Hint 2:</span><input type="text" id="hint6-2" placeholder="Hint 2" required>
+        <span class="hint-label">Hint 3:</span><input type="text" id="hint6-3" placeholder="Hint 3" required>
+      </div>
+    </div>
+    <button type="submit">Save Settings</button>
   </form>
   <p id="status"></p>
-  <script>
-    const container = document.getElementById("codesAndHints");
-    for (let i = 1; i <= 6; i++) {
-      const section = document.createElement("div");
-      section.style.display = "flex";
-      section.style.alignItems = "center";
-      section.style.gap = "10px";
-      section.style.marginBottom = "10px";
-      section.innerHTML = `
-        <label style="min-width:60px;">Code ${i}</label>
-        <input type="text" id="code${i}" placeholder="Code ${i}" required>
-        <input type="text" id="hint${i}-1" placeholder="Hint 1" style="flex:1">
-        <input type="text" id="hint${i}-2" placeholder="Hint 2" style="flex:1">
-        <input type="text" id="hint${i}-3" placeholder="Hint 3" style="flex:1">
-      `;
-      container.appendChild(section);
-    }
-  </script>
 </body>
 </html>
