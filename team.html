@@ -52,11 +52,12 @@
       for (let i = 0; i < 6; i++) {
         const block = document.createElement("div");
         block.className = "code-block";
-        let hintButtons = "";
+        let hintButtons = `<div class="hint-container">`;
         for (let j = 1; j <= 3; j++) {
           const key = `c${i+1}-h${j}`;
           hintButtons += `<button class="hint-btn pulsing" id="${key}" title="-${j} min" data-key="${key}" data-minutes="${j}">?</button>`;
         }
+        hintButtons += `</div>`;
         block.innerHTML = `
           <input id="code${i+1}" class="code-input" placeholder="Code ${i+1}">
           <button class="validate-btn" onclick="validateCode(${i+1})">Validate</button>
@@ -155,6 +156,17 @@
     .flash-success { animation:green-flash 1s ease-in-out; }
     #hintLog, #finalMessage { text-align:center; font-size:1.2em; margin-top:10px; }
     input, button { width: 80%; max-width: 300px; }
+  
+    .hint-container {
+      display: flex;
+      justify-content: center;
+      gap: 0.5em;
+      margin-top: 0.5em;
+    }
+    .hint-btn {
+      flex: 0 0 auto;
+    }
+
   </style>
 </head>
 <body>
