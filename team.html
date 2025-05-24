@@ -146,6 +146,7 @@
       const msg = document.getElementById(`msg${index}`);
       if (input.value.trim().toLowerCase() === correctCodes[index-1].toLowerCase()) {
         msg.textContent = "Correct";
+        input.classList.remove("error");
         input.classList.add("success");
         status[index-1] = true;
         if (status.every(Boolean)) {
