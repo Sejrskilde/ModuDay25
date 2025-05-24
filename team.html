@@ -75,6 +75,10 @@
       // Attach handlers
       document.querySelectorAll(".hint-btn").forEach(button => {
         button.addEventListener("click", async () => {
+          if (!confirm("Du er ved at bruge et hint - det koster tid! Er du sikker?")) {
+            return;
+          }
+
           const key = button.dataset.key;
           const mins = parseInt(button.dataset.mins);
           alert(hints[key] || "No hint configured.");
@@ -150,6 +154,7 @@
         input.classList.add("success");
         status[index-1] = true;
         if (status.every(Boolean)) {
+          document.getElementById("buildKeyBtn").disabled = false;
           document.getElementById("finalMessage").textContent = "💾 DATA RECOVERED - Decryption key created \"MAKE IT BETTER.\"";
           document.body.classList.add("flash-success");
         }
@@ -163,6 +168,14 @@
     };
 
     document.addEventListener("DOMContentLoaded", loadConfig);
+    // Build decryption key button handler
+    document.addEventListener("DOMContentLoaded", () => {
+      const buildBtn = document.getElementById("buildKeyBtn");
+      buildBtn.addEventListener("click", () => {
+        alert('Decryption key created "Make It Better"');
+        document.getElementById("finalMessage").textContent = 'Decryption key created "Make It Better"';
+      });
+    });
   </script>
   <style>
     body { margin:0; padding:20px; font-family:monospace; background:black; color:lime; }
@@ -191,5 +204,6 @@
   <div id="codesContainer"></div>
   <div id="hintLog">Total time penalty: 0 minutes</div>
   <p id="finalMessage"></p>
+  <button id="buildKeyBtn" disabled>Build decryption key</button>
 </body>
 </html>
