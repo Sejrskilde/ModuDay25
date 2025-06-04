@@ -59,6 +59,7 @@
         let hintHTML = '<div class="hint-container">';
         for (let j = 1; j <= 3; j++) {
           const key = `c${i+1}-h${j}`;
+          const mins = j * 2;  // 1→2, 2→4, 3→6
           hintHTML += `<button class="hint-btn" id="${key}" data-key="${key}" data-mins="${j}" title="-${j} min">?</button>`;
         }
         hintHTML += '</div>';
