@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MODU - Hacked</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body, html { margin:0; padding:0; height:100%; overflow:hidden; }
+    body { font-family: monospace; background: black; color: lime; }
+    iframe { position: fixed; top:0; left:0; width:100%; height:100%; border:none; filter: blur(5px) brightness(0.5); }
+    #overlay {
+      position: relative; z-index:1;
+      background: rgba(0,0,0,0.85);
+      padding: 20px; border: 2px solid lime;
+      color: lime; text-align:center;
+      max-width: 600px; margin: 50px auto; border-radius:8px;
+    }
+    input, button { margin: 10px 0; padding: 10px; font-size: 1em; width: 80%; max-width: 300px; }
+    #progressContainer {
+      display: none; width: 80%; max-width: 300px;
+      background: #333; height: 20px; border-radius: 5px;
+      overflow: hidden; margin: 10px auto;
+    }
+    #progressBar {
+      width: 0%; height: 100%; background: lime;
+      transition: width 3s ease-in-out;
+    }
+    @keyframes red-flash {
+      0%,100% { border-color: red; color: red; }
+      50% { border-color: red; color: red; }
+    }
+    #overlay.flash-error { animation: red-flash 1s ease-in-out; }
+    .hidden { opacity: 0; pointer-events: none; transition: opacity 1s ease-in-out; }
+  </style>
+</head>
+<body>
+  <iframe src="https://www.moduvalves.com"></iframe>
+  <div id="overlay">
+    <img src="Hack_Logo.png" alt="Hack Logo" style="width:100px; margin-bottom:10px;">
+    <h1>RedBear Hackers</h1>
+    <p>Hello MODU TEAM. Your data has been encrypted by RedBear Hackers. You have until the timer runs out to decrypt the data or everything will be destroyed.</p>
+    <p><strong>Deadline:</strong> <span id="deadlineDisplay">--</span></p>
+    <h2 id="timer">--:--</h2>
+    <input id="codeInput" placeholder="Enter decryption key">
+    <button id="validateBtn">Validate</button>
+    <div id="progressContainer"><div id="progressBar"></div></div>
+    <p id="message"></p>
+  </div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    // Firebase init
+    const firebaseConfig = {
+      apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
+      authDomain: "modudag2025.firebaseapp.com",
+      projectId: "modudag2025",
+      storageBucket: "modudag2025.firebasestorage.app",
+      messagingSenderId: "1025892096437",
+      appId: "1:1025892096437:web:2b847461eab089f52c21fc"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const configRef = doc(db, "config", "global");
+
+    // DOM references
+    const overlay = document.getElementById("overlay");
+    const timerEl = document.getElementById("timer");
+    const deadlineEl = document.getElementById("deadlineDisplay");
+    const inputEl = document.getElementById("codeInput");
+    const validateBtn = document.getElementById("validateBtn");
+    const progressContainer = document.getElementById("progressContainer");
+    const progressBar = document.getElementById("progressBar");
+    const messageEl = document.getElementById("message");
+
+    let deadline, decryptionKey, timerInterval;
+
+    // Initialize app
+    async function init() {
+      try {
+        const snap = await getDoc(configRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          deadline = new Date(data.deadline);
+          decryptionKey = (data.decryptionKey || "").trim().toLowerCase();
+          // Remove trailing dots
+          decryptionKey = decryptionKey.replace(/\.+$/, "");
+        } else {
+          deadline = new Date();
+          decryptionKey = "";
+        }
+      } catch (e) {
+        console.error("Error loading config:", e);
+        deadline = new Date();
+        decryptionKey = "";
+      }
+      deadlineEl.textContent = deadline.toLocaleString();
+      startTimer();
+      validateBtn.addEventListener("click", validate);
+    }
+
+    // Countdown timer
+    function startTimer() {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        const now = new Date();
+        const dist = deadline - now;
+        if (dist <= 0) {
+          clearInterval(timerInterval);
+          timerEl.textContent = "00:00";
+          messageEl.textContent = "Time's up. Data destroyed!";
+          inputEl.disabled = true;
+          validateBtn.disabled = true;
+        } else {
+          const hrs = Math.floor(dist / 3600000);
+          const mins = Math.floor((dist % 3600000) / 60000);
+          const secs = Math.floor((dist % 60000) / 1000);
+          const timeStr = (hrs > 0 ? hrs + ":" : "") +
+            mins.toString().padStart(2,'0') + ":" + secs.toString().padStart(2,'0');
+          timerEl.textContent = timeStr;
+        }
+      }, 1000);
+    }
+
+    // Flash red on error
+    function flashError() {
+      overlay.classList.add("flash-error");
+      setTimeout(() => overlay.classList.remove("flash-error"), 1000);
+    }
+
+    // Show decryption progress
+    function showProgress() {
+      clearInterval(timerInterval);
+      inputEl.style.display = "none";
+      validateBtn.style.display = "none";
+      progressContainer.style.display = "block";
+      progressBar.style.width = "0%";
+      setTimeout(() => progressBar.style.width = "100%", 50);
+      setTimeout(() => {
+        overlay.classList.add("hidden");
+        document.querySelector("iframe").style.filter = "none";
+      }, 3050);
+    }
+
+    // Validate code (case-insensitive, strip trailing dots)
+    function validate() {
+      let val = inputEl.value.trim().toLowerCase();
+      val = val.replace(/\.+$/, ""); 
+      if (val === decryptionKey && new Date() < deadline) {
+        messageEl.textContent = 'Decryption key created "Make It Better"';
+        showProgress();
+      } else {
+        messageEl.textContent = "Wrong code. Try again.";
+        flashError();
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>
