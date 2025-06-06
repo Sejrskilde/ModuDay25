@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <title>MAKE IT BETTER - Vi lover af:</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: sans-serif;
+      background: #111;
+      color: #fff;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2em;
+      margin-bottom: 0.5em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #555;
+      text-align: left;
+    }
+    th {
+      background: #222;
+    }
+    tbody tr {
+      background: #000;
+    }
+    tbody tr.new-entry {
+      animation: highlightFade 2s ease-in-out;
+    }
+    @keyframes highlightFade {
+      0%   { background: rgba(0, 255, 0, 0.4); }
+      100% { background: #000; }
+    }
+  </style>
+</head>
+<body>
+  <h1>MAKE IT BETTER - Vi lover af:</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Navn</th>
+        <th>Mit løfte</th>
+      </tr>
+    </thead>
+    <tbody id="suggestionsBody">
+      <tr><td colspan="2">Indlæser…</td></tr>
+    </tbody>
+  </table>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      orderBy,
+      onSnapshot
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    // --- 1) Firebase-konfiguration (samme som promise.html) ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
+      authDomain: "modudag2025.firebaseapp.com",
+      projectId: "modudag2025",
+      storageBucket: "modudag2025.firebasestorage.app",
+      messagingSenderId: "1025892096437",
+      appId: "1:1025892096437:web:2b847461eab089f52c21fc"
+    };
+
+    // --- 2) Initialiser Firebase og Firestore ---
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // --- 3) Reference til 'suggestions' i Firestore, sorteret efter oprettelsestid (nyeste først) ---
+    const suggestionsCol = query(
+      collection(db, "suggestions"),
+      orderBy("createdAt", "desc")
+    );
+
+    // --- 4) DOM-elementer og state ---
+    const tbody = document.getElementById("suggestionsBody");
+    let displayedIds = new Set();     // Holder styr på ID’er, der allerede er vist
+    let initialLoad = true;           // Markerer første hentning
+
+    // --- 5) Hjælpefunktion til at opbygge en række i tabellen ---
+    function createRow(name, pledge, docId) {
+      const tr = document.createElement("tr");
+      tr.setAttribute("data-id", docId);
+      tr.innerHTML = `
+        <td>${name}</td>
+        <td>${pledge}</td>
+      `;
+      return tr;
+    }
+
+    // --- 6) Funktion der sørger for at tilføje nye indslag med 5 sekunders mellemrum ---
+    function handleNewEntries(newDocs) {
+      // newDocs er en array af querySnapshot.docs (nyt først – nyeste først)
+      newDocs.forEach((docSnap, index) => {
+        // Indsæt hvert nyt løfte med en forsinkelse på index * 5000 ms
+        setTimeout(() => {
+          const data = docSnap.data();
+          const name = data.name || "Ukendt";
+          const pledge = data.pledge || "";
+          const docId = docSnap.id;
+
+          // Byg række og indsæt øverst i <tbody>
+          const row = createRow(name, pledge, docId);
+          row.classList.add("new-entry");
+          tbody.prepend(row);
+
+          // Marker som vist
+          displayedIds.add(docId);
+
+        }, index * 5000);
+      });
+    }
+
+    // --- 7) Lyt real-time på 'suggestions' med onSnapshot ---
+    onSnapshot(suggestionsCol, (snapshot) => {
+      const docs = snapshot.docs; // Array af dokumenter i sorteret rækkefølge (nyeste først)
+
+      if (initialLoad) {
+        // Første indlæsning: vis alle straks, nyeste først
+        tbody.innerHTML = ""; // Tøm "Indlæser…" besked
+        docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          const name = data.name || "Ukendt";
+          const pledge = data.pledge || "";
+          const docId = docSnap.id;
+
+          const row = createRow(name, pledge, docId);
+          tbody.append(row);
+          displayedIds.add(docId);
+        });
+        initialLoad = false;
+      } else {
+        // Efterfølgende: find hvilke der er nye (ikke i displayedIds)
+        const newDocs = docs.filter(docSnap => !displayedIds.has(docSnap.id));
+        if (newDocs.length > 0) {
+          handleNewEntries(newDocs);
+        }
+      }
+    }, (error) => {
+      console.error("Fejl ved hentning af forslag:", error);
+      tbody.innerHTML = `<tr><td colspan="2">Kunne ikke indlæse forslag.</td></tr>`;
+    });
+  </script>
+</body>
+</html>
