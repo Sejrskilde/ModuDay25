@@ -60,7 +60,7 @@
         for (let j = 1; j <= 3; j++) {
           const key = `c${i+1}-h${j}`;
           const mins = j * 2;  // 1→2, 2→4, 3→6
-          hintHTML += `<button class="hint-btn" id="${key}" data-key="${key}" data-mins="${j}" title="-${j} min">?</button>`;
+          hintHTML += `<button class="hint-btn" id="${key}" data-key="${key}" data-mins="${mins}" title="-${mins} min">?</button>`;
         }
         hintHTML += '</div>';
         block.innerHTML = `
@@ -77,7 +77,7 @@
         button.addEventListener("click", async () => {
           if (!confirm("Du er ved at bruge et hint - det koster tid! Er du sikker?")) return;
           const key = button.dataset.key;
-          const mins = parseInt(button.dataset.mins);
+          const mins = parseInt(button.dataset.mins, 10);
           alert(hints[key] || "No hint configured.");
           timePenalty += mins * 60 * 1000;
           penaltyMinutes += mins;
@@ -87,8 +87,8 @@
           const snap = await getDoc(teamRef);
           const used = snap.exists() && snap.data().hints ? snap.data().hints : [];
           await setDoc(teamRef, { penalty: penaltyMinutes, hints: [...used, key] });
-          const codeIndex = parseInt(key.charAt(1));
-          const hintNum = parseInt(key.charAt(4));
+          const codeIndex = parseInt(key.charAt(1), 10);
+          const hintNum = parseInt(key.charAt(4), 10);
           if (hintNum === 1) document.getElementById(`c${codeIndex}-h2`).disabled = false;
           if (hintNum === 2) document.getElementById(`c${codeIndex}-h3`).disabled = false;
         });
