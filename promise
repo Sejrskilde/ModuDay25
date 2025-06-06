@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <title>MAKE IT BETTER</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: sans-serif;
+      background: #111;
+      color: #0f0;
+    }
+    h1 {
+      text-align: center;
+      font-size: 2em;
+      margin-bottom: 0.5em;
+    }
+    h2 {
+      text-align: center;
+      font-size: 1.2em;
+      margin-top: 0;
+      margin-bottom: 1.5em;
+    }
+    form {
+      max-width: 500px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 10px;
+      font-size: 1em;
+      background: #222;
+      border: 1px solid #0f0;
+      color: #0f0;
+      resize: vertical;
+      box-sizing: border-box;
+      border-radius: 4px;
+    }
+    button {
+      align-self: flex-end;
+      padding: 10px 20px;
+      font-size: 1em;
+      background: #0f0;
+      color: #000;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    button:disabled {
+      background: #555;
+      cursor: default;
+      color: #888;
+    }
+    #status {
+      text-align: center;
+      margin-top: 1em;
+      font-size: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h1>MAKE IT BETTER</h1>
+  <h2>Mit løfte er:</h2>
+  <form id="pledgeForm">
+    <textarea id="pledgeInput" placeholder="Skriv dit løfte eller forslag her…" required></textarea>
+    <button type="submit" id="sendBtn">SEND</button>
+  </form>
+  <p id="status"></p>
+
+  <script type="module">
+    // 1) Importér Firebase‐biblioteker
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    // 2) Indsæt jeres Firebase‐config herunder (samme som i de andre sider)
+    const firebaseConfig = {
+      apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
+      authDomain: "modudag2025.firebaseapp.com",
+      projectId: "modudag2025",
+      storageBucket: "modudag2025.firebasestorage.app",
+      messagingSenderId: "1025892096437",
+      appId: "1:1025892096437:web:2b847461eab089f52c21fc"
+    };
+
+    // 3) Initialiser app og Firestore
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // 4) Hent referencer til DOM‐elementer
+    const form = document.getElementById("pledgeForm");
+    const input = document.getElementById("pledgeInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const statusEl = document.getElementById("status");
+
+    // 5) Funktion til at indsende data til Firestore
+    async function submitPledge(e) {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      sendBtn.disabled = true;
+      statusEl.textContent = "Sender…";
+
+      try {
+        // Tilføj dokument til collection 'suggestions'
+        await addDoc(collection(db, "suggestions"), {
+          pledge: text,
+          createdAt: serverTimestamp()
+        });
+        statusEl.textContent = "Tak for dit bidrag! 🙏";
+        input.value = "";
+      } catch (err) {
+        console.error("Fejl ved indsendelse:", err);
+        statusEl.textContent = "Der opstod en fejl. Prøv igen.";
+      } finally {
+        sendBtn.disabled = false;
+        // Clear status efter nogle sekunder
+        setTimeout(() => {
+          statusEl.textContent = "";
+        }, 4000);
+      }
+    }
+
+    // 6) Bind formular‐submit
+    form.addEventListener("submit", submitPledge);
+  </script>
+</body>
+</html>
