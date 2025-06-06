@@ -5,7 +5,7 @@
   <title>MODU Admin Dashboard</title>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getFirestore, collection, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+    import { getFirestore, collection, onSnapshot, getDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
@@ -18,27 +18,58 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const configRef = doc(db, "config", "global");  // henter settings fra Firestore
+    let deadline = new Date();                      // placeholder, overskrives af fn-loadDeadline()
 
-    const tableBody = document.getElementById("teamsBody");
-    const deadline = new Date("2025-05-22T14:30:00");
-
-    function formatTimeLeft(penaltyMinutes) {
-      const now = new Date();
-      const distance = deadline - now - (penaltyMinutes * 60 * 1000);
-      if (distance <= 0) return "00:00";
-      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    // Hent deadline én gang fra Firestore
+    async function loadDeadline() {
+      try {
+        const configSnap = await getDoc(configRef);
+        if (configSnap.exists()) {
+          const data = configSnap.data();
+          if (data.deadline) {
+            deadline = new Date(data.deadline);
+          }
+        }
+      } catch (e) {
+        console.error("Kunne ikke hente deadline fra Firestore:", e);
+      }
     }
 
+    // Formatter "Time Left" som HH:MM:SS (eller MM:SS hvis < 1 time)
+    function formatTimeLeft(penaltyMinutes) {
+      const now = new Date();
+      const remainingMs = deadline - now - penaltyMinutes * 60 * 1000;
+      if (remainingMs <= 0) return "00:00:00";
+
+      // Beregn timer, minutter, sekunder
+      const totalSeconds = Math.floor(remainingMs / 1000);
+      const hours   = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      // Hvis der er mindst én time, vis HH:MM:SS, ellers MM:SS
+      if (hours > 0) {
+        return `${hours.toString().padStart(2,"0")}:` +
+               `${minutes.toString().padStart(2,"0")}:` +
+               `${seconds.toString().padStart(2,"0")}`;
+      } else {
+        return `${minutes.toString().padStart(2,"0")}:` +
+               `${seconds.toString().padStart(2,"0")}`;
+      }
+    }
+
+    // Opdater tabellen med live-data
     function updateTable(data) {
+      const tableBody = document.getElementById("teamsBody");
       tableBody.innerHTML = "";
       Object.entries(data).forEach(([team, info]) => {
+        const penaltyMin = info.penalty || 0;
         const row = document.createElement("tr");
         row.innerHTML = `
           <td>${team}</td>
-          <td>${info.penalty || 0} min</td>
-          <td>${formatTimeLeft(info.penalty || 0)}</td>
+          <td>${penaltyMin} min</td>
+          <td>${formatTimeLeft(penaltyMin)}</td>
           <td>${(info.hints || []).join(", ")}</td>
           <td><button onclick="resetTeam('${team}')">Reset</button></td>
         `;
@@ -46,27 +77,46 @@
       });
     }
 
-    onSnapshot(collection(db, "teams"), (snapshot) => {
-      const data = {};
-      snapshot.forEach(doc => {
-        data[doc.id] = doc.data();
-      });
-      updateTable(data);
-    });
-
+    // Slet et hold (reset)
     window.resetTeam = async function(teamId) {
-      if (confirm(`Are you sure you want to reset ${teamId}?`)) {
+      if (confirm(`Er du sikker på, du vil reset ${teamId}?`)) {
         await deleteDoc(doc(db, "teams", teamId));
       }
-    }
+    };
+
+    // Når siden loader:
+    window.addEventListener("DOMContentLoaded", async () => {
+      await loadDeadline();  // sørg for, at 'deadline' er sat korrekt
+      onSnapshot(collection(db, "teams"), (snapshot) => {
+        const allData = {};
+        snapshot.forEach(docSnap => {
+          allData[docSnap.id] = docSnap.data();
+        });
+        updateTable(allData);
+      });
+      // Opdater visningen hvert sekund, så "Time Left" tæller ned
+      setInterval(async () => {
+        onSnapshot(collection(db, "teams"), (snapshot) => {
+          const allData = {};
+          snapshot.forEach(docSnap => {
+            allData[docSnap.id] = docSnap.data();
+          });
+          updateTable(allData);
+        });
+      }, 1000);
+    });
   </script>
   <style>
-    body { font-family: sans-serif; background: #111; color: #0f0; padding: 20px; }
-    h1 { color: #0f0; text-align: center; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { padding: 10px; border: 1px solid #0f0; text-align: center; }
+    body { font-family: sans-serif; background: #111; color: #fff; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: 8px 12px;
+      border: 1px solid #555;
+      text-align: center;
+    }
     th { background: #222; }
-    button { padding: 5px 10px; font-size: 0.9em; cursor: pointer; }
+    button { padding: 4px 8px; font-size: 0.9em; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -82,7 +132,7 @@
       </tr>
     </thead>
     <tbody id="teamsBody">
-      <tr><td colspan="5">Loading...</td></tr>
+      <tr><td colspan="5">Loading…</td></tr>
     </tbody>
   </table>
 </body>
