@@ -8,6 +8,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
+    // --- 1) Firebase init ---
     const firebaseConfig = {
       apiKey: "AIzaSyC_RruSTKjm6F25I9oPvNE4-PGQrda9UaQ",
       authDomain: "modudag2025.firebaseapp.com",
@@ -16,110 +17,166 @@
       messagingSenderId: "1025892096437",
       appId: "1:1025892096437:web:2b847461eab089f52c21fc"
     };
-
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const teamId = new URLSearchParams(window.location.search).get("team") || "demo";
-    const teamRef = doc(db, "teams", teamId);
-    const configRef = doc(db, "config", "global");
+    const db  = getFirestore(app);
 
-    let correctCodes = [];
-    let hints = {};
-    let deadline;
-    let timePenalty = 0;
-    let penaltyMinutes = 0;
-    let status = [false, false, false, false, false, false];
+    // --- 2) Referencer & state ---
+    const teamId   = new URLSearchParams(window.location.search).get("team") || "demo";
+    const teamRef  = doc(db, "teams", teamId);
+    const configRef= doc(db, "config", "global");
+
+    let correctCodes  = [];
+    let hints         = {};
+    let deadline      = null;
+    let timePenalty   = 0;
+    let penaltyMinutes= 0;
+    let status        = [false, false, false, false, false, false];
     let buildBtn;
 
+    // --- 3) Load konfiguration & initialiser UI ---
     async function loadConfig() {
       const snap = await getDoc(configRef);
-      if (!snap.exists()) {
-        alert("No config found.");
-        return;
-      }
+      if (!snap.exists()) return alert("Ingen konfiguration fundet.");
       const data = snap.data();
       correctCodes = data.correctCodes || [];
-      hints = data.hints || {};
-      deadline = new Date(data.deadline);
+      hints        = data.hints        || {};
+      deadline     = new Date(data.deadline);
+
       document.getElementById("deadlineDisplay").textContent = deadline.toLocaleString();
       buildUI();
       await loadTeamState();
+
       buildBtn = document.getElementById("buildKeyBtn");
       buildBtn.disabled = true;
       buildBtn.addEventListener("click", handleBuildKey);
+
       startTimer();
     }
 
+    // --- 4) Byg HTML-UI for koder + hint knapper ---
     function buildUI() {
       const codesContainer = document.getElementById("codesContainer");
       codesContainer.innerHTML = "";
+
       for (let i = 0; i < 6; i++) {
         const block = document.createElement("div");
         block.className = "code-block";
+
+        // Hint-knapper: 2, 4, 6 minutter
         let hintHTML = '<div class="hint-container">';
         for (let j = 1; j <= 3; j++) {
-          const key = `c${i+1}-h${j}`;
-          const mins = j * 2;  // 1→2, 2→4, 3→6
-          hintHTML += `<button class="hint-btn" id="${key}" data-key="${key}" data-mins="${mins}" title="-${mins} min">?</button>`;
+          const key  = `c${i+1}-h${j}`;
+          const mins = j * 2; // 1→2, 2→4, 3→6
+          hintHTML += `<button
+                         class="hint-btn"
+                         id="${key}"
+                         data-key="${key}"
+                         data-mins="${mins}"
+                         title="-${mins} min">?</button>`;
         }
         hintHTML += '</div>';
+
         block.innerHTML = `
-          <input id="code${i+1}" class="code-input" placeholder="Code ${i+1}">
+          <input  id="code${i+1}" class="code-input" placeholder="Code ${i+1}">
           <button class="validate-btn" onclick="validateCode(${i+1})">Validate</button>
           ${hintHTML}
           <span id="msg${i+1}" class="msg"></span>
         `;
         codesContainer.appendChild(block);
+
+        // Lås 2. & 3. hint indtil 1. er brugt
         document.getElementById(`c${i+1}-h2`).disabled = true;
         document.getElementById(`c${i+1}-h3`).disabled = true;
       }
+
+      // Tilføj klik-handler til alle hint-knapper
       document.querySelectorAll(".hint-btn").forEach(button => {
         button.addEventListener("click", async () => {
-          if (!confirm("Du er ved at bruge et hint - det koster tid! Er du sikker?")) return;
-          const key = button.dataset.key;
+          const key  = button.dataset.key;
           const mins = parseInt(button.dataset.mins, 10);
-          alert(hints[key] || "No hint configured.");
-          timePenalty += mins * 60 * 1000;
-          penaltyMinutes += mins;
-          document.getElementById("hintLog").textContent = `Total time penalty: ${penaltyMinutes} minutes`;
-          button.classList.add("hint-used");
-          button.disabled = true;
+
+          // Hent hidtil brugte hints
           const snap = await getDoc(teamRef);
-          const used = snap.exists() && snap.data().hints ? snap.data().hints : [];
-          await setDoc(teamRef, { penalty: penaltyMinutes, hints: [...used, key] });
+          const used = snap.exists() && snap.data().hints
+                       ? snap.data().hints
+                       : [];
+
+          // Hvis allerede brugt: vis blot hintet igen
+          if (used.includes(key)) {
+            alert(hints[key] || "Der findes desværre ikke noget hint for denne nøgle.");
+            return;
+          }
+
+          // Confirmation første gang
+          if (!confirm("Du er ved at bruge et hint — det koster tid! Er du sikker?")) {
+            return;
+          }
+
+          // Tjek at hint eksisterer
+          if (!hints[key]) {
+            alert("Der findes desværre ikke noget hint for denne nøgle.");
+            return;
+          }
+
+          // Vis hint og tilføj straf
+          alert(hints[key]);
+          timePenalty    += mins * 60 * 1000;
+          penaltyMinutes += mins;
+          document.getElementById("hintLog").textContent =
+            `Total time penalty: ${penaltyMinutes} minutes`;
+
+          // Marker visuelt som brugt (men behold klikbar)
+          button.classList.add("hint-used");
+
+          // Gem i Firestore (merge)
+          await setDoc(teamRef, {
+            penalty: penaltyMinutes,
+            hints: [...used, key]
+          }, { merge: true });
+
+          // Lås op for næste hint i rækken
           const codeIndex = parseInt(key.charAt(1), 10);
-          const hintNum = parseInt(key.charAt(4), 10);
-          if (hintNum === 1) document.getElementById(`c${codeIndex}-h2`).disabled = false;
-          if (hintNum === 2) document.getElementById(`c${codeIndex}-h3`).disabled = false;
+          const hintNum   = parseInt(key.charAt(4), 10);
+          if (hintNum === 1) {
+            document.getElementById(`c${codeIndex}-h2`).disabled = false;
+          }
+          if (hintNum === 2) {
+            document.getElementById(`c${codeIndex}-h3`).disabled = false;
+          }
         });
       });
     }
 
+    // --- 5) Hent team-state (straffe + brugte hints) ved load ---
     async function loadTeamState() {
       const snap = await getDoc(teamRef);
       if (!snap.exists()) return;
       const data = snap.data();
       penaltyMinutes = data.penalty || 0;
-      timePenalty = penaltyMinutes * 60 * 1000;
-      document.getElementById("hintLog").textContent = `Total time penalty: ${penaltyMinutes} minutes`;
+      timePenalty    = penaltyMinutes * 60 * 1000;
+      document.getElementById("hintLog").textContent =
+        `Total time penalty: ${penaltyMinutes} minutes`;
+
       const used = data.hints || [];
       for (let i = 0; i < 6; i++) {
         for (let j = 1; j <= 3; j++) {
           const key = `c${i+1}-h${j}`;
           const btn = document.getElementById(key);
+          // 2. & 3. hint er låst, indtil forrige er brugt
           btn.disabled = (j > 1 && !used.includes(`c${i+1}-h${j-1}`));
           if (used.includes(key)) {
             btn.classList.add("hint-used");
-            btn.disabled = true;
+            // men behold evt. disabled=false for genvisning
           }
         }
       }
     }
 
+    // --- 6) Nedtællingsur ---
     function startTimer() {
       const timerEl = document.getElementById("timer");
       setInterval(() => {
-        const now = new Date();
+        const now  = new Date();
         const dist = deadline - now - timePenalty;
         if (dist <= 0) {
           timerEl.textContent = "00:00";
@@ -127,16 +184,17 @@
           buildBtn.disabled = true;
         } else {
           const m = Math.floor((dist % (1000*60*60)) / (1000*60));
-          const s = Math.floor((dist % (1000*60)) / 1000);
+          const s = Math.floor((dist % (1000*60))    / 1000);
           timerEl.textContent = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
           buildBtn.disabled = !(status.every(Boolean) && dist > 0);
         }
       }, 1000);
     }
 
+    // --- 7) Validerings-funktion for koder ---
     window.validateCode = (index) => {
       const input = document.getElementById(`code${index}`);
-      const msg = document.getElementById(`msg${index}`);
+      const msg   = document.getElementById(`msg${index}`);
       if (input.value.trim().toLowerCase() === correctCodes[index-1].toLowerCase()) {
         msg.textContent = "Correct";
         input.classList.remove("error");
@@ -151,6 +209,7 @@
       }
     };
 
+    // --- 8) Build key knap ---
     function handleBuildKey() {
       const now = new Date();
       if (deadline - now - timePenalty <= 0) {
@@ -158,31 +217,39 @@
         document.getElementById("finalMessage").textContent = "Error - time run out!!";
       } else if (status.every(Boolean)) {
         alert('Decryption key created "Make It Better"');
-        document.getElementById("finalMessage").textContent = 'Decryption key created "Make It Better"';
+        document.getElementById("finalMessage").textContent =
+          'Decryption key created "Make It Better"';
       }
     }
 
     document.addEventListener("DOMContentLoaded", loadConfig);
   </script>
+
   <style>
     body { margin:0; padding:20px; font-family:monospace; background:black; color:lime; }
     h1, p, h2 { text-align:center; }
     #codesContainer { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:20px 0; }
     .code-block { display:flex; flex-direction:column; align-items:center; width:45%; min-width:200px; }
-    .code-input, .validate-btn, #buildKeyBtn { font-size:1.2em; margin:5px; padding:10px; width:100%; box-sizing:border-box; }
-    .hint-btn { font-size:1.2em; margin:5px; padding:10px; width:auto; max-width:3em; }
+    .code-input, .validate-btn, #buildKeyBtn {
+      font-size:1.2em; margin:5px; padding:10px; width:100%; box-sizing:border-box;
+    }
     .hint-container { display:flex; justify-content:center; gap:0.5em; margin-top:0.5em; }
-    .hint-used { opacity:0.4; pointer-events:none; }
-    .success { border:3px solid lime; }
-    .error { border:3px solid red; }
-    @keyframes shake {0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+    .hint-btn {
+      font-size:1.2em; padding:10px; width:auto; max-width:3em;
+    }
+    .hint-used { opacity:0.6; }   /* markeret som brugt, men klikbar */
+    .success   { border:3px solid lime; }
+    .error     { border:3px solid red; }
+    @keyframes shake { 0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);} }
     .shake { animation:shake 0.5s ease-in-out; }
-    @keyframes red-flash {0%{background:rgba(255,0,0,0.3);}100%{background:transparent;}}
-    .flash-error { animation:red-flash 1s ease-in-out; }
-    @keyframes green-flash {0%{background:rgba(0,255,0,0.3);}100%{background:transparent;}}
-    .flash-success { animation:green-flash 1s ease-in-out; }
-    #hintLog, #finalMessage { text-align:center; font-size:1.2em; margin-top:10px; }
-    #buildKeyBtn { font-size:1.2em; padding:10px; margin:10px auto; display:block; }
+    @keyframes red-flash { 0%{background:rgba(255,0,0,0.3);}100%{background:transparent;} }
+    .flash-error   { animation:red-flash 1s ease-in-out; }
+    #hintLog, #finalMessage {
+      text-align:center; font-size:1.2em; margin-top:10px;
+    }
+    #buildKeyBtn {
+      display:block; margin:10px auto; padding:10px; font-size:1.2em;
+    }
   </style>
 </head>
 <body>
