@@ -64,14 +64,14 @@
   <div class="static"></div>
   <h1 class="radio-title">Mystisk Radiobesked</h1>
   <audio controls>
-    <source src="https://sejrskilde.github.io/ModuDay25/morse.wav" type="audio/wav">
+    <source src="https://sejrskilde.github.io/ModuDay25/morselyd.wav" type="audio/wav">
     Din browser understøtter ikke afspilning af WAV-filer.
   </audio>
   <button onclick="downloadMessage()">Download besked</button>
   <script>
     function downloadMessage() {
       const link = document.createElement('a');
-      link.href = 'https://sejrskilde.github.io/ModuDay25/morse.wav';
+      link.href = 'https://sejrskilde.github.io/ModuDay25/morselyd.wav';
       link.download = 'morse.wav';
       document.body.appendChild(link);
       link.click();
